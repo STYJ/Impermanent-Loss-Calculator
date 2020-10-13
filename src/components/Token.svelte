@@ -20,24 +20,24 @@
   }
 </script>
 
-<div>
-  Token
-  {num + 1}
-  price change (%):
-  <input
+<tr>
+  <td>
+    {num + 1}
+  </td>
+  <td>
+    <input
     type="number"
     bind:value={priceChange}
     on:input={() => {
       priceChangeUpdate(num);
     }} />
-  <br />
-  Token
-  {num + 1}
-  weight (%):
-  <input
+  </td>
+  <td>
+    <input
     type="number"
     bind:value={weight}
     on:input={() => {
       weightUpdate(num);
     }} />
-</div>
+  </td>
+</tr>

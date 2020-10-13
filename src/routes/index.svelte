@@ -68,12 +68,20 @@
   </div>
   <div>
     <p>2. Modify price change and weightage of tokens:</p>
-    {#each Array(tokenCount) as _, i}
+    <table>
+      <tr>
+        <th>Token</th>
+        <th>Price change (%)</th>
+        <th>Weight (%)</th>
+      </tr>
+      {#each Array(tokenCount) as _, i}
       <Token
         num={i}
         on:priceChange={handlePriceChangeUpdate}
         on:weight={handleWeightUpdate} />
     {/each}
+    </table>
+    
   </div>
   <div>
     <p>
