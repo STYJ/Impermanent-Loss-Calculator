@@ -1,12 +1,22 @@
 <script lang="ts">
-  import { calcImpermanentLoss, round } from "../javascript/math";
+  import {
+    calcImpermanentLoss,
+    calcRemainingInventory,
+    round,
+  } from "../javascript/math";
   const maxTokenCount: number = 2;
   let tokenNames: string[] = ["ABC", "XYZ"];
   let tokenBalances: number[] = [0, 0];
   let tokenWeights: number[] = [50, 50];
-  let tokenPrices: number[] = [0, 0];
-  let updatedPrices: number[] = [0, 0];
-  let priceDiffPercentage: number[] = [100, 100];
+  let updatedBalances: number[] = [0, 0];
+
+  // When flipped is false, price is for token A in terms of token B
+  // When flipped is true, price is for token B in terms of token A
+  let flipped: boolean = false;
+  let initialPrice: number = 0;
+  let updatedPrice: number = 0;
+  let pricePercentage: number = 100;
+
   let err: string = "";
   let IL: number = 0;
 
@@ -17,21 +27,24 @@
       tokenWeights[0] &&
       tokenWeights[1]
     ) {
-      tokenPrices[1] =
-        (tokenBalances[0] * tokenWeights[1]) /
-        (tokenBalances[1] * tokenWeights[0]);
-      updatedPrices[1] = tokenPrices[1];
-      tokenPrices[0] =
+      initialPrice =
         (tokenBalances[1] * tokenWeights[0]) /
         (tokenBalances[0] * tokenWeights[1]);
-      updatedPrices[0] = tokenPrices[0];
+      updatedPrice = initialPrice;
+      updatedBalances = tokenBalances;
     }
   }
 
-  function updateDiff() {
-    for (let i: number = 0; i < maxTokenCount; i++) {
-      priceDiffPercentage[i] = (updatedPrices[i] / tokenPrices[i]) * 100;
-    }
+  function flip() {
+    flipped = !flipped;
+    initialPrice = 1 / initialPrice;
+    updatedPrice = initialPrice;
+    pricePercentage = 100;
+    IL = 0;
+  }
+
+  function updatePricePercentage() {
+    pricePercentage = (updatedPrice / initialPrice) * 100;
   }
 </script>
 
@@ -39,14 +52,15 @@
   #err {
     color: red;
   }
-  p {
-    font-weight: bold;
-  }
-
   table,
   th,
   td {
     border: 1px solid black;
+  }
+
+  .selected {
+    border: 2px solid red;
+    border-radius: 4px;
   }
 </style>
 
@@ -56,18 +70,24 @@
     <h5 id="err">Error: {err}</h5>
   {/if}
   <div>
-    <p>1. Specify token name, token quantity supplied & token weight (%)</p>
+    <h3>1. Specify token name, token quantity supplied & token weight (%)</h3>
     <table>
       <tr>
         <th>Token Name</th>
-        <th>Quantity Supplied</th>
+        <th>Qty Supplied</th>
         <th>Weight (%)</th>
       </tr>
       {#each Array(maxTokenCount) as _, i}
         <tr>
-          <td><input type="text" bind:value={tokenNames[i]} /></td>
           <td>
             <input
+              class:selected={+flipped == i}
+              type="text"
+              bind:value={tokenNames[i]} />
+          </td>
+          <td>
+            <input
+              class:selected={+flipped == i}
               type="number"
               bind:value={tokenBalances[i]}
               on:input={() => {
@@ -76,6 +96,7 @@
           </td>
           <td>
             <input
+              class:selected={+flipped == i}
               type="number"
               bind:value={tokenWeights[i]}
               on:input={() => {
@@ -85,137 +106,80 @@
         </tr>
       {/each}
     </table>
-    <p>2. Modify token price</p>
+    <h3>
+      2. Modify token price
+      <button
+        on:click={() => {
+          flip();
+        }}>
+        flip me!
+      </button>
+    </h3>
+
+    <p>
+      Initial Price: 1
+      {tokenNames[+flipped]}
+      =
+      {initialPrice}
+      {tokenNames[+!flipped]}
+    </p>
+    <p>
+      Modified Price: 1
+      {tokenNames[+flipped]}
+      =
+      <input
+        type="number"
+        bind:value={updatedPrice}
+        on:input={() => {
+          updatePricePercentage();
+          IL = calcImpermanentLoss(pricePercentage, tokenWeights, flipped);
+          updatedBalances = calcRemainingInventory(updatedPrice, tokenBalances, tokenWeights, flipped);
+        }} />
+      {tokenNames[+!flipped]}
+    </p>
+    <p>
+      Price Diff (%):
+      {#if pricePercentage < 100}
+        {round(100 - pricePercentage)}%↓
+      {:else if pricePercentage > 100}
+        {round(pricePercentage - 100)}%↑
+      {:else}0%{/if}
+    </p>
+    <h3>3. Results</h3>
+    <p>
+      Impermanent Loss:
+      {#if isNaN(IL) || !isFinite(IL)}0%{:else}{round(IL * -100)}%{/if}
+    </p>
+    <p />
+    <p>
+      Hodl value:
+      {round(tokenBalances[+flipped] + tokenBalances[+!flipped] / updatedPrice)}
+      {tokenNames[+flipped]}
+      ==
+      {round(tokenBalances[+flipped] * updatedPrice + tokenBalances[+!flipped])}
+      {tokenNames[+!flipped]}
+    </p>
+    <p>
+      Pooled value:
+      {round((updatedBalances[+flipped] / tokenWeights[+flipped]) * 100)}
+      {tokenNames[+flipped]}
+      ==
+      {round((updatedBalances[+!flipped] / tokenWeights[+!flipped]) * 100)}
+      {tokenNames[+!flipped]}
+    </p>
     <table>
       <tr>
-        <th>Token</th>
-        <th>Initial Price</th>
-        <th>Updated Price</th>
-        <th>Price Diff (%)</th>
+        <th>Token Name</th>
+        <th>Initial Qty</th>
+        <th>Final Qty</th>
       </tr>
       {#each Array(maxTokenCount) as _, i}
         <tr>
-          <td>
-            1
-            {#if tokenNames[i] == ''}token B{:else}{tokenNames[i]}{/if}
-          </td>
-          <td>
-            {#if tokenPrices[i] == 0}1{:else}{tokenPrices[i]}{/if}
-            {#if tokenNames[(i + 1) % 2] == ''}token B{:else}{tokenNames[(i + 1) % 2]}{/if}
-          </td>
-          <td>
-            {#if tokenPrices[i] == 0}
-              1
-            {:else}
-              <input
-                type="number"
-                bind:value={updatedPrices[i]}
-                on:input={() => {
-                  updateDiff();
-                  IL = calcImpermanentLoss(tokenWeights, priceDiffPercentage);
-                }} />
-            {/if}
-            {#if tokenNames[(i + 1) % 2] == ''}token A{:else}{tokenNames[(i + 1) % 2]}{/if}
-          </td>
-          <td>
-            {#if priceDiffPercentage[i] < 100}
-              {round(100 - priceDiffPercentage[i])}%↓
-            {:else if priceDiffPercentage[i] > 100}
-              {round(priceDiffPercentage[i] - 100)}%↑
-            {:else}0%{/if}
-          </td>
+          <td>{tokenNames[i]}</td>
+          <td>{round(tokenBalances[i])}</td>
+          <td>{round(updatedBalances[i])}</td>
         </tr>
       {/each}
-      <!-- <tr> -->
-<!--         
-
-        <td>
-          1
-          {#if tokenNames[0] == ''}token A{:else}{tokenNames[0]}{/if}
-        </td>
-        <td>
-          {#if tokenPrices[0] == 0}1{:else}{tokenPrices[0]}{/if}
-          {#if tokenNames[0] == ''}token B{:else}{tokenNames[0]}{/if}
-        </td>
-        <td>
-          {#if tokenPrices[0] == 0}
-            1
-          {:else}
-            <input
-              type="number"
-              bind:value={updatedPrices[0]}
-              on:input={() => {
-                updateDiff();
-                IL = calcImpermanentLoss(tokenWeights, priceDiffPercentage);
-              }} />
-          {/if}
-          {#if tokenNames[1] == ''}token B{:else}{tokenNames[1]}{/if}
-        </td>
-        <td>
-          {#if priceDiffPercentage[0] < 100}
-            {round(100 - priceDiffPercentage[0])}%↓
-          {:else if priceDiffPercentage[0] > 100}
-            {round(priceDiffPercentage[0] - 100)}%↑
-          {:else}0%{/if}
-        </td>
-      </tr>
-
-      <tr>
-        <td>
-          1
-          {#if tokenNames[1] == ''}token B{:else}{tokenNames[1]}{/if}
-        </td>
-        <td>
-          {#if tokenPrices[1] == 0}1{:else}{tokenPrices[1]}{/if}
-          {#if tokenNames[0] == ''}token B{:else}{tokenNames[0]}{/if}
-        </td>
-        <td>
-          {#if tokenPrices[1] == 0}
-            1
-          {:else}
-            <input
-              type="number"
-              bind:value={updatedPrices[1]}
-              on:input={() => {
-                updateDiff();
-                IL = calcImpermanentLoss(tokenWeights, priceDiffPercentage);
-              }} />
-          {/if}
-          {#if tokenNames[0] == ''}token A{:else}{tokenNames[0]}{/if}
-        </td>
-        <td>
-          {#if priceDiffPercentage[1] < 100}
-            {round(100 - priceDiffPercentage[1])}%↓
-          {:else if priceDiffPercentage[1] > 100}
-            {round(priceDiffPercentage[1] - 100)}%↑
-          {:else}0%{/if}
-        </td>
-      </tr> -->
     </table>
-    <!-- <p>
-      1
-      {#if tokenNames[1] == ''}token B{:else}{tokenNames[1]}{/if}
-      =
-      {#if tokenPrices[0] == 0}
-        1
-      {:else}
-        <input
-          type="number"
-          bind:value={updatedPrices[0]}
-          on:input={() => {
-            updateDiff();
-            IL = calcImpermanentLoss(tokenWeights, priceDiffPercentage);
-          }} />
-      {/if}
-      {#if tokenNames[0] == ''}token A{:else}{tokenNames[0]}{/if}
-      {#if priceDiffPercentage[0] < 100}
-        {round(100 - priceDiffPercentage[0])}%↓
-      {:else if priceDiffPercentage[0] > 100}
-        {round(priceDiffPercentage[0] - 100)}%↑
-      {:else}no change{/if}
-    </p> -->
-    <p>3. Results</p>
-    Impermanent Loss:
-    {#if isNaN(IL) || !isFinite(IL)}0%{:else}{round(IL * -100)}%{/if}
   </div>
 </main>
