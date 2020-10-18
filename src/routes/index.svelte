@@ -235,12 +235,12 @@
           </button>
         </th>
       </tr>
-      
+
       {#if +flipped}
         <tr>
           <td>{tokenNames[0]}</td>
           <td>
-            {round(tokenBalances[+flipped] * updatedPrice  + tokenBalances[+!flipped])}
+            {round(tokenBalances[+flipped] * updatedPrice + tokenBalances[+!flipped])}
           </td>
           <td>
             {round((updatedBalances[+!flipped] / tokenWeights[+!flipped]) * 100)}
@@ -260,7 +260,6 @@
           <td>{tokenNames[0]}</td>
           <td>
             {round(tokenBalances[+flipped] + tokenBalances[+!flipped] / updatedPrice)}
-
           </td>
           <td>
             {round((updatedBalances[+flipped] / tokenWeights[+flipped]) * 100)}
@@ -270,12 +269,10 @@
           <td>{tokenNames[1]}</td>
           <td>
             {round(tokenBalances[+flipped] * updatedPrice + tokenBalances[+!flipped])}
-
           </td>
           <td>
             {round((updatedBalances[+!flipped] / tokenWeights[+!flipped]) * 100)}
           </td>
-          
         </tr>
       {/if}
     </table>
